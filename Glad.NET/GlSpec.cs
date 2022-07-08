@@ -91,6 +91,26 @@ namespace Glad
                 yield return Commands.Find(cmd => cmd.Name.Equals(name, StringComparison.Ordinal));
         }
 
+        public IEnumerable<Command> GetExtensionCommands(Api api)
+        {
+            foreach (var ext in Extensions)
+            {
+                if ((ext.Supported & api) > 0)
+                {
+                    var i = ext.GetEnumerator();
+                    while (i.MoveNext())
+                    {
+                        var extName = i.Current.Name;
+                        var command = Commands.Find(cmd => cmd.Name.Equals(extName, StringComparison.Ordinal));
+                        if (null != command)
+                        {                         
+                            yield return command;
+                        }
+                    }
+                }
+            }
+        }
+
         public IEnumerable<EnumMember> GetEnums(Api api, Version version, Profile profile)
         {
             var allEnums = Enums.SelectMany(e => e).ToList();

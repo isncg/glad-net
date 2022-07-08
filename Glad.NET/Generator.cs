@@ -264,6 +264,13 @@ namespace Glad
                 writer.WriteLine();
             }
 
+            foreach (var cmd in spec.GetExtensionCommands(api))
+            {
+                var import = GenerateCommand(spec, cmd, writer);
+                buffer.Add(import);
+                writer.WriteLine();
+            }
+
             return buffer;
         }
 
