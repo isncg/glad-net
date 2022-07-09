@@ -90,7 +90,9 @@ namespace Glad
                 { "out", "output" },
                 { "params", "parameters" },
                 { "string", "str" },
-                { "ref", "reference" }
+                { "ref", "reference" },
+                { "object", "obj" },
+                { "event", "evnt" }
             };
         }
 
@@ -193,10 +195,16 @@ namespace Glad
                 writer.Indent++;
 
                 var count = 0;
-                foreach (var member in enumeration)
+                List<EnumMember> members = new List<EnumMember>(enumeration);
+                members.Sort((a, b) => a.Value.CompareTo(b.Value));
+                HashSet<string> nameSet = new HashSet<string>();
+                foreach (var member in members)
                 {
                     count++;
                     var name = EnumMemberName(member.Name);
+                    if (nameSet.Contains(name))
+                        continue;
+                    nameSet.Add(name);
                     writer.Write($"{name} = {member.Value}");
                     writer.WriteLine(count < enumeration.Count ? "," : string.Empty);
                 }
@@ -216,16 +224,27 @@ namespace Glad
                 writer.WriteLine($"public enum {group.Name}");
                 writer.WriteLine("{");
                 writer.Indent++;
+
+                List<Tuple<NamedEntry, EnumMember>> list = new List<Tuple<NamedEntry, EnumMember>>();
                 foreach (var member in group)
                 {
+                    if (list.Exists(item => item.Item1.Name.Equals(member.Name, StringComparison.Ordinal)))
+                    {
+                        Console.WriteLine(member.Name);
+                        continue;
+                    }
                     var m = all.Find(e => e.Name.Equals(member.Name, StringComparison.Ordinal));
                     if (m is null)
                     {
                         Console.WriteLine(member.Name);
                         continue;
                     }
+                    list.Add(new Tuple<NamedEntry, EnumMember>(member, m));                    
+                }
 
-                    writer.WriteLine($"{EnumMemberName(member.Name)} = {m.Value},");
+                foreach (var e_m in list)
+                {
+                    writer.WriteLine($"{EnumMemberName(e_m.Item1.Name)} = {e_m.Item2.Value},");
                 }
                 writer.Indent--;
                 writer.WriteLine("}");
@@ -250,22 +269,32 @@ namespace Glad
                         buffer.Append(word.Substring(1));
                 }
             }
-            return buffer.ToString();
+            var str = buffer.ToString();
+            if (str[0] >= '0' && str[0] <= '9')
+                str = "_" + str;
+            return str;
         }
 
 
         public static IEnumerable<string> GenerateCommands(GlSpec spec, Api api, Profile profile, Version version, IndentedTextWriter writer)
         {
             var buffer = new List<string>();
+            HashSet<string> names = new HashSet<string>();
             foreach (var cmd in spec.GetCommands(api, version, profile))
             {
+                if (names.Contains(cmd.Name))
+                    continue;
+                names.Add(cmd.Name);
                 var import = GenerateCommand(spec, cmd, writer);
                 buffer.Add(import);
-                writer.WriteLine();
+                writer.WriteLine();                
             }
 
             foreach (var cmd in spec.GetExtensionCommands(api))
             {
+                if (names.Contains(cmd.Name))
+                    continue;
+                names.Add(cmd.Name);
                 var import = GenerateCommand(spec, cmd, writer);
                 buffer.Add(import);
                 writer.WriteLine();
@@ -318,7 +347,9 @@ namespace Glad
 
         public static string GenerateParameter(GlSpec spec, Parameter param)
         {
-            var name = param.Words.Last();
+            var name = param.Name;
+            if (null == name)
+                name = param.Words.Last();
             if (NAME_REPLACE.TryGetValue(name, out var value))
                 name = value;
 
@@ -369,7 +400,9 @@ namespace Glad
                 return GetEnumName(ref spec, proto.Group);
             if (type.Equals("GLbitmask", StringComparison.Ordinal))
                 return GetBitmaskName(ref spec, proto.Group);
-            
+            if (type.Equals("GLbitfield", StringComparison.Ordinal))
+                type = GetBitmaskName(ref spec, proto.Group);
+
             if (TYPE_REPLACE.TryGetValue(type, out var result))
                 return result;
 

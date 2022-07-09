@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Xml;
 
 namespace Glad.Spec
@@ -7,12 +8,21 @@ namespace Glad.Spec
         public string LengthParam { get; }
 
         public string Type { get; }
+        public string Name { get; }
 
         public Parameter(XmlElement node) : base(node)
         {
             LengthParam = node.HasAttribute("len") ? node.GetAttribute("len") : null;
             Type = node["ptype"]?.InnerText;
-      
+            if (null != Type)
+            {
+                var sp = Type.Split(" ");
+                if (null != sp && sp.Length > 0)
+                {
+                    Type = null;
+                }
+            }
+            Name = node["name"]?.InnerText;
 
         }
     }
