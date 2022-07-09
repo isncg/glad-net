@@ -23,7 +23,12 @@ namespace Glad.Spec
             Words = new List<string>();
             foreach (XmlNode child in node.ChildNodes)
                 Words.Add(child.InnerText.Trim());
-
+            int starcount = 0;
+            foreach (var w in Words)
+            {
+                starcount += w.Count(c => c == '*');
+            }
+            StarCount = starcount;
             Group = node.HasAttribute("group") ? node.GetAttribute("group") : null;
         }
 
@@ -32,7 +37,8 @@ namespace Glad.Spec
         /// <summary>
         /// Gets a value indicating if the underlying type type is a pointer.
         /// </summary>
-        public bool IsPointer => Words.Any(w => w.Contains("*"));
+        public bool IsPointer => StarCount > 0;
+        public int StarCount { get; }
 
         public bool IsConstPointer => Words.Any(w => w.Contains("const"));
 

@@ -48,9 +48,9 @@ namespace Glad
             {
                 { "GLboolean", "bool" },
                 { "GLvoid", "void" },
-                { "GLbyte", "sbyte" },
-                { "GLchar", "sbyte" },
-                { "GLcharARB", "sbyte" },
+                { "GLbyte", "byte" },
+                { "GLchar", "byte" },
+                { "GLcharARB", "byte" },
                 { "GLubyte", "byte" },
                 { "GLshort", "short" },
                 { "GLushort", "ushort" },
@@ -135,6 +135,7 @@ namespace Glad
                     writer.WriteLine();
 
                     //var groups = GenerateEnums(spec, api, profile, version, writer);
+                    GenerateRawEnums(spec, writer);
                     GenerateEnums(spec, api, profile, version, writer);
 
                     //GenerateGroups(spec, groups, writer);
@@ -146,13 +147,19 @@ namespace Glad
                     writer.WriteLine("[SuppressMessage(\"ReSharper\", \"IdentifierTypo\")]");
                     writer.WriteLine("[SuppressMessage(\"ReSharper\", \"InconsistentNaming\")]");
 
-                        
-                        
-                   
-                    writer.WriteLine("public static class Gl");
+
+
+                    writer.WriteLine("public static unsafe class Gl");
                     writer.WriteLine("{");
                     writer.Indent++;
 
+                    writer.WriteLine("public static T GetDelegateForFunctionPointer<T>(GetProcAddressHandler loader, string name)");
+                    writer.WriteLine("{");
+                    writer.WriteLine("    var addr = loader.Invoke(name);");
+                    writer.WriteLine("    if (addr == IntPtr.Zero)");
+                    writer.WriteLine("        return default(T);");
+                    writer.WriteLine("    return Marshal.GetDelegateForFunctionPointer<T>(addr);");
+                    writer.WriteLine("}");
                    
                     var imports = GenerateCommands(spec, api, profile, version, writer);
 
@@ -174,6 +181,42 @@ namespace Glad
             }
         }
 
+        public static void GenerateRawEnums(GlSpec spec, IndentedTextWriter writer)
+        {
+            Dictionary<string, EnumMember> nameDict = new Dictionary<string, EnumMember>();
+            foreach (var enumeration in spec.Enums)
+            {
+                //foreach (var kv in enumeration.GroupDict)
+                //{
+                    foreach(var member in enumeration)
+                    {
+                        if (nameDict.ContainsKey(member.Name))
+                            continue;
+                        nameDict[member.Name] = member;
+                    }                  
+                //}
+            }
+            writer.WriteLine($"public static class GlEnum");
+            writer.WriteLine("{");
+            writer.Indent++;
+            foreach (var kv in nameDict)
+            {
+                EnumMember member = kv.Value;
+                string type = "uint";
+                if (!string.IsNullOrEmpty(member.Type))
+                    type = ENUMTYPE_REPLACE[member.Type];
+                else
+                {
+                    if (member.Value.StartsWith("-"))
+                        type = "int";
+                }
+                writer.WriteLine($"public static {type} {member.Name} = {member.Value};");
+            }
+            writer.Indent--;
+            writer.WriteLine("}");
+        }
+
+
         public static IEnumerable<Spec.Group> GenerateEnums(GlSpec spec, Api api, Profile profile, Version version, IndentedTextWriter writer)
         {
             //var groups = new List<Spec.Group>(spec.Groups);
@@ -182,6 +225,11 @@ namespace Glad
             {
                 foreach(var kv in enumeration.GroupDict)
                 {
+                    if(string.IsNullOrWhiteSpace(kv.Key))
+                    {
+                        Console.WriteLine("EMPTY KEY " + kv.Value.Name);
+                        continue;
+                    }
                     if(groupDict.TryGetValue(kv.Key, out var glist))
                     {
                         glist.AddRange(kv.Value);
@@ -206,10 +254,19 @@ namespace Glad
                     }
                     enumType = ENUMTYPE_REPLACE[typeNames[0]];
                 }
-                if(null == enumType)
-                    writer.WriteLine($"public enum {kv.Key}");
+
+                bool isSpecialNumbers = kv.Key.Equals("SpecialNumbers", StringComparison.Ordinal);
+                if (isSpecialNumbers)
+                {
+                    writer.WriteLine($"public static class {kv.Key}");
+                }
                 else
-                    writer.WriteLine($"public enum {kv.Key} : {enumType}");
+                {
+                    if (null == enumType)
+                        writer.WriteLine($"public enum {kv.Key}");
+                    else
+                        writer.WriteLine($"public enum {kv.Key} : {enumType}");
+                }
                 writer.WriteLine("{");
                 writer.Indent++;
 
@@ -226,8 +283,18 @@ namespace Glad
                     if (nameSet.Contains(name))
                         continue;
                     nameSet.Add(name);
-                    writer.Write($"{name} = {member.Value}");
-                    writer.WriteLine(count < members.Count ? "," : string.Empty);
+                    if(isSpecialNumbers)
+                    {
+                        string type = "uint";
+                        if (!string.IsNullOrEmpty(member.Type))
+                            type = ENUMTYPE_REPLACE[member.Type];
+                        writer.WriteLine($"public static {type} {name} = {member.Value};");
+                    }
+                    else
+                    {
+                        writer.Write($"{name} = {member.Value}");
+                        writer.WriteLine(count < members.Count ? "," : string.Empty);
+                    }
                     //if (enumeration.Group is null)
                     //    continue;
                     //if (enumeration.Group.Equals("SpecialNumbers", StringComparison.Ordinal))
@@ -317,24 +384,25 @@ namespace Glad
 
         public static string EnumMemberName(string input)
         {
-            var buffer = new StringBuilder();
-            foreach (var word in input.Split('_').Select(s => s.ToLower()))
-            {
-                if (word == "gl")
-                    continue;
-                if (WORD_REPLACE.TryGetValue(word, out var result))
-                    buffer.Append(result);
-                else
-                {
-                    buffer.Append(char.ToUpperInvariant(word[0]));
-                    if (word.Length > 1)
-                        buffer.Append(word.Substring(1));
-                }
-            }
-            var str = buffer.ToString();
-            if (str[0] >= '0' && str[0] <= '9')
-                str = "_" + str;
-            return str;
+            return input;
+            //var buffer = new StringBuilder();
+            //foreach (var word in input.Split('_').Select(s => s.ToLower()))
+            //{
+            //    if (word == "gl")
+            //        continue;
+            //    if (WORD_REPLACE.TryGetValue(word, out var result))
+            //        buffer.Append(result);
+            //    else
+            //    {
+            //        buffer.Append(char.ToUpperInvariant(word[0]));
+            //        if (word.Length > 1)
+            //            buffer.Append(word.Substring(1));
+            //    }
+            //}
+            //var str = buffer.ToString();
+            //if (str[0] >= '0' && str[0] <= '9')
+            //    str = "_" + str;
+            //return str;
         }
 
 
@@ -367,11 +435,12 @@ namespace Glad
 
         private static string GenerateCommand(GlSpec spec, Command command, IndentedTextWriter writer)
         {
-            
 
-            var name = command.Name.Substring(2);
+
+            var name = command.Name;
             var proto = GenerateReturnType(spec, command.Proto);
             var args = command.Select(p => GenerateParameter(spec, p)).ToList();
+            var argNames = command.Select(p => GenerateParameterNames(spec, p)).ToList();
 
             var argString = string.Join(", ", args);
 
@@ -379,7 +448,7 @@ namespace Glad
 
             writer.WriteLine("[UnmanagedFunctionPointer(CallingConvention.Cdecl)]");
             writer.WriteLine($"private delegate {proto} {delegateName}({argString});");
-            writer.WriteLine($"private static {delegateName} {command.Name};");
+            writer.WriteLine($"private static {delegateName} _{command.Name};");
             writer.WriteLine();
             writer.WriteLine($"public static {proto} {name}({argString})");
             writer.WriteLine("{");
@@ -387,24 +456,24 @@ namespace Glad
 
             if (!proto.Equals("void", StringComparison.Ordinal))
                 writer.Write("return ");
-            writer.Write($"{command.Name}.Invoke(");
-
-            for (var i = 0; i < args.Count; i++)
-            {
-                var words = args[i].Split(' ');
-                if (words[0].Equals("out", StringComparison.Ordinal))
-                    writer.Write($"out {words.Last()}");
-                else
-                    writer.Write(words.Last());
-                if (i < args.Count - 1) 
-                    writer.Write(", ");
-            }
+            writer.Write($"_{command.Name}.Invoke(");
+            writer.Write(string.Join(", ", argNames));
+            //for (var i = 0; i < args.Count; i++)
+            //{
+            //    var words = args[i].Split(' ');
+            //    if (words[0].Equals("out", StringComparison.Ordinal))
+            //        writer.Write($"out {words.Last()}");
+            //    else
+            //        writer.Write(words.Last());
+            //    if (i < args.Count - 1) 
+            //        writer.Write(", ");
+            //}
             writer.WriteLine(");");
             writer.Indent--;
             writer.WriteLine("}");
 
             return
-                $"{command.Name} = Marshal.GetDelegateForFunctionPointer<{delegateName}>(loader.Invoke(\"{command.Name}\"));";
+                $"_{command.Name} = GetDelegateForFunctionPointer<{delegateName}>(loader,\"{command.Name}\");";
         }
 
         public static string GenerateParameter(GlSpec spec, Parameter param)
@@ -417,9 +486,13 @@ namespace Glad
 
             if (param.Type is null)
             {
-                if (param.IsConstPointer)
+                if (param.IsPointer)
+                {
                     return $"IntPtr {name}";
-                return $"out IntPtr {name}";
+                }
+                //if (param.IsConstPointer)
+                //    return $"IntPtr {name}";
+                //return $"out IntPtr {name}";
             }
 
             var type = param.Type;
@@ -433,20 +506,37 @@ namespace Glad
             else
                 Debug.WriteLine($"Unknown GL type: {type}");
 
-            if (param.IsConstConstPointer)
+            if (param.IsPointer)
             {
-                Debug.WriteLine("MEH");
+                return $"{type} " + "***********".Substring(0, param.StarCount) + $"{name}";
             }
-            else if (param.IsConstPointer)
-            {
-                return $"{type}[] {name}";
-            }
-            else if (param.IsPointer)
-            {
-                return $"out {type} {name}";
-            }
+            //{
+            //    return $"out {type} {name}";
+            //}
+            //if (param.IsConstConstPointer)
+            //{
+            //    Debug.WriteLine("MEH");
+            //}
+            //else if (param.IsConstPointer)
+            //{
+            //    return $"{type}[] {name}";
+            //}
+            //else if (param.IsPointer)
+            //{
+            //    return $"out {type} {name}";
+            //}
 
             return $"{type} {name}";
+        }
+
+        public static string GenerateParameterNames(GlSpec spec, Parameter param)
+        {
+            var name = param.Name;
+            if (null == name)
+                name = param.Words.Last();
+            if (NAME_REPLACE.TryGetValue(name, out var value))
+                name = value;
+            return name;
         }
 
         private static string GenerateReturnType(GlSpec spec, Prototype proto)

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Xml;
 
 namespace Glad.Spec
@@ -13,7 +14,7 @@ namespace Glad.Spec
         public EnumMember(XmlElement node) : base(node)
         {
             Value = node.GetAttribute("value");
-            Group = node.GetAttribute("group").Split(",");
+            Group = new List<string>(node.GetAttribute("group").Split(",")).FindAll(s=>!string.IsNullOrWhiteSpace(s)).ToArray();
             Type = node.GetAttribute("type");
             if (string.IsNullOrWhiteSpace(Value))
                 throw new XmlException("Value cannot be null/empty.");
