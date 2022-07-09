@@ -16,8 +16,8 @@ namespace Glad.Spec
             Type = node["ptype"]?.InnerText;
             if (null != Type)
             {
-                var sp = Type.Split(" ");
-                if (null != sp && sp.Length > 0)
+                var sp = Type.Trim().Split(" ");
+                if (null != sp && sp.Length>1)
                 {
                     Type = null;
                 }
