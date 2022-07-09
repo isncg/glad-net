@@ -18,6 +18,7 @@ namespace Glad
         private static readonly Dictionary<string, string> WORD_REPLACE;
         private static readonly Dictionary<string, string> TYPE_REPLACE;
         private static readonly Dictionary<string, string> NAME_REPLACE;
+        private static readonly Dictionary<string, string> ENUMTYPE_REPLACE;
 
         static Generator()
         {
@@ -94,6 +95,14 @@ namespace Glad
                 { "object", "obj" },
                 { "event", "evnt" }
             };
+            ENUMTYPE_REPLACE = new Dictionary<string, string>
+            {
+                { "bitmask", "uint"},
+                { "u", "uint"},
+                { "ull", "ulong"}
+            };
+
+
         }
 
 
@@ -125,9 +134,10 @@ namespace Glad
                     writer.WriteLine("public delegate void VulkanDebugProcNV();");
                     writer.WriteLine();
 
-                    var groups = GenerateEnums(spec, api, profile, version, writer);
+                    //var groups = GenerateEnums(spec, api, profile, version, writer);
+                    GenerateEnums(spec, api, profile, version, writer);
 
-                    GenerateGroups(spec, groups, writer);
+                    //GenerateGroups(spec, groups, writer);
 
                     writer.WriteLine();
 
@@ -166,38 +176,49 @@ namespace Glad
 
         public static IEnumerable<Spec.Group> GenerateEnums(GlSpec spec, Api api, Profile profile, Version version, IndentedTextWriter writer)
         {
-            var groups = new List<Spec.Group>(spec.Groups);
-
+            //var groups = new List<Spec.Group>(spec.Groups);
+            Dictionary<string, Spec.Group> groupDict = new Dictionary<string, Spec.Group>();
             foreach (var enumeration in spec.Enums)
             {
-                if (enumeration.Group is null)
-                    continue;
-                if (enumeration.Group.Equals("SpecialNumbers", StringComparison.Ordinal))
-                    continue;
-
-                groups.RemoveAll(g => g.Name.Equals(enumeration.Group, StringComparison.Ordinal));
-
-                writer.WriteLine();
-
-                if (enumeration.Type is null)
+                foreach(var kv in enumeration.GroupDict)
                 {
-                    writer.WriteLine($"public enum {enumeration.Group}");
+                    if(groupDict.TryGetValue(kv.Key, out var glist))
+                    {
+                        glist.AddRange(kv.Value);
+                    }
+                    else
+                    {
+                        groupDict[kv.Key] = new Spec.Group(kv.Value);
+                    }
                 }
-                else if (enumeration.Type.Equals("bitmask", StringComparison.Ordinal))
+            }
+
+            foreach (var kv in groupDict)
+            {
+                string enumType = null;
+                List<string> typeNames = new List<string>(kv.Value.type);
+                if (typeNames.Count > 0)
                 {
-                    writer.WriteLine("[Flags]");
-                    writer.WriteLine($"public enum {enumeration.Group} : uint");
+                    if (typeNames.Count > 1)
+                    {
+                        Console.WriteLine("ENUMTYPE: " + string.Join(",", typeNames) + " of " + kv.Key);
+                        enumType = "error";
+                    }
+                    enumType = ENUMTYPE_REPLACE[typeNames[0]];
                 }
+                if(null == enumType)
+                    writer.WriteLine($"public enum {kv.Key}");
                 else
-                    throw new InvalidOperationException("Unknown enumeration type.");
-
+                    writer.WriteLine($"public enum {kv.Key} : {enumType}");
                 writer.WriteLine("{");
                 writer.Indent++;
 
                 var count = 0;
-                List<EnumMember> members = new List<EnumMember>(enumeration);
+                Spec.Group members = new Spec.Group(kv.Value);
                 members.Sort((a, b) => a.Value.CompareTo(b.Value));
                 HashSet<string> nameSet = new HashSet<string>();
+
+
                 foreach (var member in members)
                 {
                     count++;
@@ -206,52 +227,93 @@ namespace Glad
                         continue;
                     nameSet.Add(name);
                     writer.Write($"{name} = {member.Value}");
-                    writer.WriteLine(count < enumeration.Count ? "," : string.Empty);
-                }
+                    writer.WriteLine(count < members.Count ? "," : string.Empty);
+                    //if (enumeration.Group is null)
+                    //    continue;
+                    //if (enumeration.Group.Equals("SpecialNumbers", StringComparison.Ordinal))
+                    //    continue;
 
+                        //groups.RemoveAll(g => g.Name.Equals(enumeration.Group, StringComparison.Ordinal));
+
+                        // writer.WriteLine();
+
+                        //if (enumeration.Type is null)
+                        //{
+                        //    writer.WriteLine($"public enum {enumeration.Group}");
+                        //}
+                    //else if (enumeration.Type.Equals("bitmask", StringComparison.Ordinal))
+                    //{
+                    //    writer.WriteLine("[Flags]");
+                    //    writer.WriteLine($"public enum {enumeration.Group} : uint");
+                    //}
+                    //else
+                    //    throw new InvalidOperationException("Unknown enumeration type.");
+
+                    //writer.WriteLine("{");
+                    //writer.Indent++;
+
+                    //var count = 0;
+                    //List<EnumMember> members = new List<EnumMember>(enumeration);
+                    //members.Sort((a, b) => a.Value.CompareTo(b.Value));
+                    //HashSet<string> nameSet = new HashSet<string>();
+                    //foreach (var member in members)
+                    //{
+                    //    count++;
+                    //    var name = EnumMemberName(member.Name);
+                    //    if (nameSet.Contains(name))
+                    //        continue;
+                    //    nameSet.Add(name);
+                    //    writer.Write($"{name} = {member.Value}");
+                    //    writer.WriteLine(count < enumeration.Count ? "," : string.Empty);
+                    //}
+
+                    //writer.Indent--;
+                    //writer.WriteLine("}");
+                }
                 writer.Indent--;
                 writer.WriteLine("}");
             }
 
-            return groups;
+            return null;
+            //return groups;
         }
 
-        public static void GenerateGroups(GlSpec spec, IEnumerable<Spec.Group> groups, IndentedTextWriter writer)
-        {
-            var all = spec.Enums.SelectMany(e => e).ToList();
-            foreach (var group in groups)
-            {
-                writer.WriteLine($"public enum {group.Name}");
-                writer.WriteLine("{");
-                writer.Indent++;
+        //public static void GenerateGroups(GlSpec spec, IEnumerable<Spec.Group> groups, IndentedTextWriter writer)
+        //{
+        //    var all = spec.Enums.SelectMany(e => e).ToList();
+        //    foreach (var group in groups)
+        //    {
+        //        writer.WriteLine($"public enum {group.Name}");
+        //        writer.WriteLine("{");
+        //        writer.Indent++;
 
-                List<Tuple<NamedEntry, EnumMember>> list = new List<Tuple<NamedEntry, EnumMember>>();
-                foreach (var member in group)
-                {
-                    if (list.Exists(item => item.Item1.Name.Equals(member.Name, StringComparison.Ordinal)))
-                    {
-                        Console.WriteLine(member.Name);
-                        continue;
-                    }
-                    var m = all.Find(e => e.Name.Equals(member.Name, StringComparison.Ordinal));
-                    if (m is null)
-                    {
-                        Console.WriteLine(member.Name);
-                        continue;
-                    }
-                    list.Add(new Tuple<NamedEntry, EnumMember>(member, m));                    
-                }
+        //        List<Tuple<NamedEntry, EnumMember>> list = new List<Tuple<NamedEntry, EnumMember>>();
+        //        foreach (var member in group)
+        //        {
+        //            if (list.Exists(item => item.Item1.Name.Equals(member.Name, StringComparison.Ordinal)))
+        //            {
+        //                Console.WriteLine(member.Name);
+        //                continue;
+        //            }
+        //            var m = all.Find(e => e.Name.Equals(member.Name, StringComparison.Ordinal));
+        //            if (m is null)
+        //            {
+        //                Console.WriteLine(member.Name);
+        //                continue;
+        //            }
+        //            list.Add(new Tuple<NamedEntry, EnumMember>(member, m));                    
+        //        }
 
-                foreach (var e_m in list)
-                {
-                    writer.WriteLine($"{EnumMemberName(e_m.Item1.Name)} = {e_m.Item2.Value},");
-                }
-                writer.Indent--;
-                writer.WriteLine("}");
-                writer.WriteLine();
-            }
+        //        foreach (var e_m in list)
+        //        {
+        //            writer.WriteLine($"{EnumMemberName(e_m.Item1.Name)} = {e_m.Item2.Value},");
+        //        }
+        //        writer.Indent--;
+        //        writer.WriteLine("}");
+        //        writer.WriteLine();
+        //    }
             
-        }
+        //}
 
         public static string EnumMemberName(string input)
         {

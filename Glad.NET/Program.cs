@@ -21,8 +21,8 @@ namespace Glad
 
             Generator.Generate(spec, Api.GL, Profile.Core, new Version(3, 3));
 
-
-            Console.ReadLine();
+            Console.WriteLine("FINISHED");
+            //Console.ReadLine();
         }
 
         private static IEnumerable<Api> ApiChoices()

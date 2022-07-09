@@ -36,7 +36,7 @@ namespace Glad
 
         public void Parse()
         {
-            ParseGroups();
+            //ParseGroups();
             ParseEnums();
             ParseCommands();
             ParseFeatures();
@@ -64,12 +64,12 @@ namespace Glad
 
         public async Task ParseAsync() => await new Task(Parse);
 
-        private void ParseGroups()
-        {
-            Groups.Clear();
-            foreach (XmlElement group in root["groups"].GetElementsByTagName("group"))
-                Groups.Add(new Group(group));
-        }
+        //private void ParseGroups()
+        //{
+        //    Groups.Clear();
+        //    foreach (XmlElement group in root["groups"].GetElementsByTagName("group"))
+        //        Groups.Add(new Group(group));
+        //}
 
         private void ParseEnums()
         {
