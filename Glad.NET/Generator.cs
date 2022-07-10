@@ -202,14 +202,14 @@ namespace Glad
             foreach (var kv in nameDict)
             {
                 EnumMember member = kv.Value;
-                string type = "uint";
-                if (!string.IsNullOrEmpty(member.Type))
-                    type = ENUMTYPE_REPLACE[member.Type];
-                else
-                {
-                    if (member.Value.StartsWith("-"))
-                        type = "int";
-                }
+                string memberType = member.Type;
+                if (string.IsNullOrEmpty(memberType))
+                    memberType = member.Parent.Type;
+                string type = "int";
+                if (!string.IsNullOrEmpty(memberType))
+                    type = ENUMTYPE_REPLACE[memberType];
+                else if (member.Value.StartsWith("0x") && member.Value.Length == 10 && member.Value[2] >= '8')
+                    type = "uint";
                 writer.WriteLine($"public static {type} {member.Name} = {member.Value};");
             }
             writer.Indent--;

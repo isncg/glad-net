@@ -27,7 +27,7 @@ namespace Glad.Spec
             GroupDict = new Dictionary<string, Group>();
             foreach (XmlElement member in node.GetElementsByTagName("enum"))
             {
-                var enumMember = new EnumMember(member);
+                var enumMember = new EnumMember(member, this);
                 Add(enumMember);
                 List<string> groupNames = new List<string>(enumMember.Group);
                 if (groupNames.Count == 0 && !string.IsNullOrWhiteSpace(Group))
