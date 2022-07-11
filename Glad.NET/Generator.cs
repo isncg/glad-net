@@ -135,7 +135,6 @@ namespace Glad
                     writer.WriteLine();
 
                     //var groups = GenerateEnums(spec, api, profile, version, writer);
-                    GenerateRawEnums(spec, writer);
                     GenerateEnums(spec, api, profile, version, writer);
 
                     //GenerateGroups(spec, groups, writer);
@@ -149,8 +148,9 @@ namespace Glad
 
 
 
-                    writer.WriteLine("public static unsafe class Gl");
+                    writer.WriteLine("public static unsafe partial class Gl");
                     writer.WriteLine("{");
+                    GenerateRawEnums(spec, writer);
                     writer.Indent++;
 
                     writer.WriteLine("public static T GetDelegateForFunctionPointer<T>(GetProcAddressHandler loader, string name)");
@@ -196,9 +196,9 @@ namespace Glad
                     }                  
                 //}
             }
-            writer.WriteLine($"public static class GlEnum");
-            writer.WriteLine("{");
-            writer.Indent++;
+            //writer.WriteLine($"public static class GlEnum");
+            //writer.WriteLine("{");
+            //writer.Indent++;
             foreach (var kv in nameDict)
             {
                 EnumMember member = kv.Value;
@@ -212,8 +212,8 @@ namespace Glad
                     type = "uint";
                 writer.WriteLine($"public static {type} {member.Name} = {member.Value};");
             }
-            writer.Indent--;
-            writer.WriteLine("}");
+            //writer.Indent--;
+            //writer.WriteLine("}");
         }
 
 
